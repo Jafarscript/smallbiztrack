@@ -1,7 +1,12 @@
 import axios from "axios";
+import { useState } from "react";
+import { FaEye } from "react-icons/fa6";
+import { FaEyeSlash } from "react-icons/fa";
 import { Link } from "react-router";
 
 const SignUp = () => {
+    const [showpassword, setShowPassword] = useState(false);
+    
   const handleSubmit = async (e) => {
     e.preventDefault();
     const name = e.target.name.value;
@@ -41,18 +46,21 @@ const SignUp = () => {
               className="mt-0.5 w-full rounded border-black border shadow-sm p-2 outline-none"
             />
           </label>
-          <label htmlFor="password">
-            <span className="text-sm font-medium text-gray-700">
-              {" "}
-              Password{" "}
-            </span>
-
-            <input
-              type="password"
-              id="password"
-              className="mt-0.5 w-full rounded border-black border shadow-sm p-2 outline-none"
-            />
-          </label>
+           <label htmlFor="password" className="relative">
+                      <span className="text-sm font-medium text-gray-700">
+                        {" "}
+                        Password{" "}
+                      </span>
+          
+                      <input
+                        type={showpassword ? "text" : "password"}
+                        id="password"
+                        className="mt-0.5 w-full relative rounded border-black border shadow-sm p-2 outline-none"
+                      />
+                      <span onClick={() => setShowPassword(!showpassword)} className="absolute right-3 top-12 transform -translate-y-1/2 cursor-pointer">
+                        {showpassword ? <FaEye className="text-gray-500" /> : <FaEyeSlash className="text-gray-500" />}
+                      </span>
+                    </label>
           <button
             className="inline-block rounded-sm focus:bg-indigo-400 bg-indigo-600 px-8 py-3 text-sm font-medium text-white transition hover:scale-105 cursor-pointer hover:shadow-xl focus:ring-3 focus:outline-hidden"
             type="submit"
