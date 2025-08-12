@@ -1,7 +1,6 @@
 import axios from "axios";
 import { Link, useNavigate } from "react-router";
-import { FaEye } from "react-icons/fa";
-import { FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useState } from "react";
 
 const Login = () => {
