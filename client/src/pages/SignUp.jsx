@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useState } from "react";
-import { FaEye } from "react-icons/fa6";
+import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa";
 import { Link } from "react-router";
 
@@ -70,7 +70,7 @@ const SignUp = () => {
         </form>
         <p className="mt-4 text-sm text-gray-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-indigo-600 hover:underline">
+          <Link to="/" className="text-indigo-600 hover:underline">
             Log In
           </Link>
         </p>

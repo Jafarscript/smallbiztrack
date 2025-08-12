@@ -6,7 +6,7 @@ import SignUp from "./pages/SignUp";
 
 const App = () => {
   const PrivateRoute = ({ children }) => {
-  return localStorage.getItem("token") ? children : <Navigate to="/login" />;
+  return localStorage.getItem("token") ? children : <Navigate to="/" />;
 };
 
   return (
