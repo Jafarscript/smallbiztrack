@@ -2,7 +2,8 @@ import express from "express"
 import cors from "cors"
 import mongoose from "mongoose"
 import dotenv from "dotenv"
-import authRoutes from "./routes/auth.js"
+import authRoutes from "./routes/auth.js";
+import productsRoutes from './routes/product.js'
 
 
 dotenv.config()
@@ -14,6 +15,7 @@ app.get("/", (req, res) => res.send("API is running..."));
 
 // Use the login route
 app.use("/api/auth", authRoutes)
+app.use("/api/products", productsRoutes)
 
 
 mongoose.connect(process.env.MONGO_URL)
