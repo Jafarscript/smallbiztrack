@@ -1,12 +1,10 @@
 import { useState } from "react";
 import useApi from "../hooks/useApi"; // A custom hook for fetching data
-import AddSaleModal from "../components/sales/AddSaleModal";
 import SalesTable from "../components/sales/SalesTable";
 import SalesToolbar from "../components/sales/SalesToolbar";
 import Pagination from "../components/ui/Pagination";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import api from "../lib/axios";
-import EditSaleModal from "../components/sales/EditSaleModal";
 import SaleFormModal from "../components/sales/SaleFormModal";
 
 // Base query parameters for fetching sales data
