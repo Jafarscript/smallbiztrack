@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import SignUp from "./pages/SignUp";
 import Products from "./pages/Products";
 import DashboardHome from "./components/DashboardHome";
+import Sales from "./pages/Sales";
 
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}>
           <Route index element={<DashboardHome />} />
           <Route path="products" element={<Products />} />
+          <Route path="sales" element={<Sales />} />
           {/* <Route path="settings" element={<Settings />} /> */}
       </Route>
       <Route path="/" element={<Login />} />

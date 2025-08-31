@@ -29,6 +29,12 @@ const Dashboard = () => {
             Products
           </Link>
           <Link
+            to="/dashboard/sales"
+            className="flex items-center p-2 rounded-md hover:bg-gray-700 transition-colors duration-200"
+          >
+            Sales
+          </Link>
+          <Link
             to="/dashboard/settings"
             className="flex items-center p-2 rounded-md hover:bg-gray-700 transition-colors duration-200"
           >
