@@ -11,7 +11,8 @@ const Dashboard = () => {
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-800 text-white flex flex-col p-4">
+      <section className='relative w-64'>
+        <aside className="fixed w-64 h-screen bg-gray-800 text-white flex flex-col p-4">
         <div className="text-xl font-bold mb-8">
           My App
         </div>
@@ -50,6 +51,7 @@ const Dashboard = () => {
           </button>
         </div>
       </aside>
+      </section>
 
       {/* Main Content Area */}
       <main className="flex-1 p-8">
