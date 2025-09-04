@@ -1,11 +1,13 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import auth from '../middleware/auth.js';
 import Product from '../models/Product.js';
 import Sale from '../models/Sale.js';
+import { getDateRange } from '../utils/dataFilters.js';
 
+const router = express.Router();
 
-const router = express.Router()
-
+// --- CREATE Sale ---
 router.post("/", auth, async (req, res) => {
   try {
     const { productId, quantity, customerName, paymentMethod } = req.body;
@@ -13,7 +15,7 @@ router.post("/", auth, async (req, res) => {
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    if (product.stock < quantity) {
+    if (product.quantity < quantity) {
       return res.status(400).json({ message: "Not enough stock available" });
     }
 
@@ -25,7 +27,7 @@ router.post("/", auth, async (req, res) => {
       totalPrice,
       customerName,
       paymentMethod,
-      user: req.user.id,
+      user: new mongoose.Types.ObjectId(req.user.id), // ✅ FIXED
     });
 
     // Reduce stock
@@ -38,59 +40,44 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-// --- LIST sales with search/filter/sort/pagination ---
+// --- LIST Sales ---
 router.get("/", auth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = new mongoose.Types.ObjectId(req.user.id); // ✅ FIXED
     const {
       search = "",
       paymentMethod,
       minQty,
       maxQty,
-      sort = "date",       // default sort field
+      sort = "date",
       order = "desc",
       page = 1,
       limit = 10,
     } = req.query;
 
-    // Whitelist fields that can be sorted
     const sortWhitelist = ["date", "quantity", "totalPrice", "customerName"];
     const sortField = sortWhitelist.includes(sort) ? sort : "date";
     const sortOrder = order === "asc" ? 1 : -1;
 
-    // Base query
     const q = { user: userId };
 
-    // Filter: paymentMethod
-    if (paymentMethod) {
-      q.paymentMethod = paymentMethod;
-    }
-
-    // Filter: minQty/maxQty
+    if (paymentMethod) q.paymentMethod = paymentMethod;
     if (minQty !== undefined || maxQty !== undefined) {
       q.quantity = {};
       if (minQty !== undefined) q.quantity.$gte = Number(minQty);
       if (maxQty !== undefined) q.quantity.$lte = Number(maxQty);
     }
-
-    // Search: customerName OR product name (requires populate later)
     if (search) {
-      q.$or = [
-        { customerName: { $regex: search, $options: "i" } },
-        // NOTE: product search has to be done after populate if you want it,
-        // but we can do it using `Sale.find(...).populate(...).match`
-      ];
+      q.$or = [{ customerName: { $regex: search, $options: "i" } }];
     }
 
-    // Pagination setup
     const pageNum = Math.max(1, parseInt(page, 10));
     const lim = Math.min(50, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * lim;
 
-    // Query DB
     const [data, total] = await Promise.all([
       Sale.find(q)
-        .populate("product") // get product details
+        .populate("product")
         .sort({ [sortField]: sortOrder })
         .skip(skip)
         .limit(lim),
@@ -109,44 +96,37 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
-
+// --- UPDATE Sale ---
 router.put("/:id", auth, async (req, res) => {
   try {
     const { productId, quantity, customerName, paymentMethod } = req.body;
 
-    // Find sale (ensure user ownership)
     const sale = await Sale.findOne({
       _id: req.params.id,
-      user: req.user.id, // fixed: should match "user" field, not "userId"
+      user: new mongoose.Types.ObjectId(req.user.id), // ✅ FIXED
     }).populate("product");
 
     if (!sale) return res.status(404).json({ error: "Sale not found" });
 
-    // --- Step 1: restore stock from old sale ---
     const oldProduct = await Product.findById(sale.product._id);
-    oldProduct.quantity += sale.quantity; // add back old sold qty
+    oldProduct.quantity += sale.quantity;
     await oldProduct.save();
 
-    // --- Step 2: check & update new product ---
     let newProduct = oldProduct;
     if (productId && productId !== String(sale.product._id)) {
       newProduct = await Product.findById(productId);
       if (!newProduct) return res.status(404).json({ error: "New product not found" });
     }
 
-    // Check stock
     if (newProduct.quantity < quantity) {
       return res.status(400).json({ message: "Not enough stock available" });
     }
 
-    // Deduct new quantity
     newProduct.quantity -= quantity;
     await newProduct.save();
 
-    // --- Step 3: recalc total price ---
     const totalPrice = newProduct.price * quantity;
 
-    // --- Step 4: update sale record ---
     sale.product = productId || sale.product._id;
     sale.quantity = quantity;
     sale.totalPrice = totalPrice;
@@ -161,14 +141,139 @@ router.put("/:id", auth, async (req, res) => {
   }
 });
 
-// Delete (no changes)
-router.delete('/:id', auth, async (req, res) => {
-    const sale = await Sale.findOne({_id : req.params.id})
+// --- DELETE Sale ---
+router.delete("/:id", auth, async (req, res) => {
+  const sale = await Sale.findOne({ _id: req.params.id });
+  if (!sale) return res.status(404).json({ error: "Not Found" });
+  await sale.deleteOne();
+  res.status(204).send();
+});
 
-    if (!sale) return res.status(404).json({error: "Not Found"});
+// --- SUMMARY ---
+router.get("/summary", auth, async (req, res) => {
+  try {
+    const { filter } = req.query;
+    const { start, end } = getDateRange(filter);
 
-    await sale.deleteOne();
-    res.status(204).send();
-})
+    const match = { user: new mongoose.Types.ObjectId(req.user.id) }; // ✅ FIXED
+    if (start && end) match.date = { $gte: start, $lte: end };
+
+    const summary = await Sale.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          totalSales: { $sum: "$totalPrice" },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- BEST SELLERS ---
+router.get("/best-sellers", auth, async (req, res) => {
+  try {
+    const { filter } = req.query;
+    const { start, end } = getDateRange(filter);
+
+    const match = { user: new mongoose.Types.ObjectId(req.user.id) }; // ✅ FIXED
+    if (start && end) match.date = { $gte: start, $lte: end };
+
+    const best = await Sale.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$product",
+          totalQty: { $sum: "$quantity" },
+          totalRevenue: { $sum: "$totalPrice" },
+        },
+      },
+      { $sort: { totalQty: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: "$product" },
+      {
+        $project: {
+          name: "$product.name",
+          totalQty: 1,
+          totalRevenue: 1,
+        },
+      },
+    ]);
+
+    res.json(best);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- STATS ---
+router.get("/stats", auth, async (req, res) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.id); // ✅ FIXED
+
+    // today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const todayStats = await Sale.aggregate([
+      { $match: { user: userId, date: { $gte: todayStart, $lte: todayEnd } } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+    ]);
+
+    // week
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekStats = await Sale.aggregate([
+      { $match: { user: userId, date: { $gte: weekStart } } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+    ]);
+
+    // total
+    const totalStats = await Sale.aggregate([
+      { $match: { user: userId } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+    ]);
+
+    res.json({
+      today: todayStats[0]?.total || 0,
+      week: weekStats[0]?.total || 0,
+      totalRevenue: totalStats[0]?.total || 0,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- LOW STOCK ---
+router.get("/low-stock", auth, async (req, res) => {
+  try {
+    const products = await Product.find({
+      user: new mongoose.Types.ObjectId(req.user.id), // ✅ FIXED
+      $expr: { $lte: ["$quantity", "$reorderLevel"] }
+    }).select("name quantity reorderLevel category");
+
+    res.json(products);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 export default router;
